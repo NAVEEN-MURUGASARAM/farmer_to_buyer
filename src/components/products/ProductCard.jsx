@@ -2,12 +2,13 @@
 import { ShoppingCart, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { useCartStore, useWishlistStore } from '@/store';
+import { useAuthStore, useCartStore, useWishlistStore } from '@/store';
 import { useToast } from '@/contexts/ToastContext';
 
 export default function ProductCard({ product }) {
   const navigate = useNavigate();
   const { addToCart } = useCartStore();
+  const { userRole } = useAuthStore();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
   const toast = useToast();
   const inWishlist = isInWishlist(product.id);
@@ -33,7 +34,7 @@ export default function ProductCard({ product }) {
     <div className="bg-white rounded-lg border border-gray-200 hover:shadow-lg transition overflow-hidden group">
       {/* Image */}
       <div className="bg-gray-100 h-48 flex items-center justify-center relative overflow-hidden">
-        <span className="text-6xl group-hover:scale-110 transition">{product.image}</span>
+        <span className="text-6xl group-hover:scale-110 transition">{product.image || "🥬"}</span>
         <button
           onClick={handleWishlistToggle}
           className={`absolute top-2 right-2 p-2 bg-white rounded-full shadow hover:bg-gray-100 transition ${
@@ -46,16 +47,16 @@ export default function ProductCard({ product }) {
 
       {/* Content */}
       <div className="p-4">
-        <p className="text-xs text-green-600 font-semibold mb-1">{product.category}</p>
-        <h3 className="font-semibold text-gray-900 truncate">{product.name}</h3>
+        <p className="text-xs text-green-600 font-semibold mb-1">{product.category || "Fresh Produce"}</p>
+        <h3 className="font-semibold text-gray-900 truncate">{product.crop_name || product.name || "Unknown Product"}</h3>
 
         {/* Rating */}
         <div className="flex items-center gap-1 my-2">
-          <span className="text-yellow-500">⭐ {product.rating}</span>
+          <span className="text-yellow-500">⭐ {product.rating || "4.5"}</span>
         </div>
 
         {/* Price */}
-        <p className="text-xl font-bold text-gray-900 mb-3">₹{product.price}</p>
+        <p className="text-xl font-bold text-gray-900 mb-3">₹{product.price_per_unit || product.price}/{product.unit || 'kg'}</p>
 
         {/* Buttons */}
         <div className="flex gap-2">
@@ -70,14 +71,18 @@ export default function ProductCard({ product }) {
           >
             View
           </Button>
-          <Button
-            onClick={handleAddToCart}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-            size="sm"
-          >
-            <ShoppingCart size={16} className="mr-2" />
-            Add to Cart
-          </Button>
+          
+          {/* Only show Add to Cart for Buyers */}
+          {userRole === 'buyer' && (
+            <Button
+              onClick={handleAddToCart}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              size="sm"
+            >
+              <ShoppingCart size={16} className="mr-2" />
+              Add to Cart
+            </Button>
+          )}
         </div>
       </div>
     </div>

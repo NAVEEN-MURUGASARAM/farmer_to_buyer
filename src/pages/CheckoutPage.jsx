@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { MapPin, Truck, CreditCard, ArrowLeft } from 'lucide-react';
 import { useCartStore, useAddressStore, useOrderStore, useAuthStore } from '@/store';
 import { useToast } from '@/contexts/ToastContext';
+import { orderService } from '@/services/orderService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -85,46 +86,32 @@ export default function CheckoutPage() {
     setIsProcessing(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
       const selectedAddress = addresses.find((addr) => addr.id === selectedAddressId);
-      const orderId = `ORD${Date.now()}`;
+      const token = localStorage.getItem('authToken'); // Get fresh token
 
-      const order = {
-        id: orderId,
-        order_number: orderId,
-        buyer_id: user?.id,
-        farmer_id: items[0]?.farmerId || '1', // In real app, this would come from product
-        subtotal: totalPrice,
-        shipping_charges: shippingCharges,
-        discount: 0,
-        total_amount: finalTotal,
-        payment_method: paymentMethod,
-        payment_status: 'paid',
-        order_status: 'pending',
-        delivery_method: deliveryMethod,
-        shipping_address: `${selectedAddress.address_line1}, ${selectedAddress.city}, ${selectedAddress.state} ${selectedAddress.pincode}`,
-        shipping_city: selectedAddress.city,
-        shipping_state: selectedAddress.state,
-        shipping_pincode: selectedAddress.pincode,
-        items: items.map((item) => ({
+      // Create an order for each item in the cart
+      // The backend spec implies one order per product payload
+      const orderPromises = items.map((item) => {
+        return orderService.createOrder({
           productId: item.productId,
-          product_name: item.name,
           quantity: item.quantity,
-          unit_price: item.price,
-          total_price: item.price * item.quantity,
-        })),
-        ordered_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      };
+          // We can optionally send address details if the backend supports it,
+          // but sticking to the minimal payload requested: productId, quantity.
+          // If the backend needs address, we might need to update the payload specs.
+          // For now, let's assume valid payload per user request.
+        }, token);
+      });
 
-      addOrder(order);
+      await Promise.all(orderPromises);
+
       clearCart();
-      toast.success('Order placed successfully!');
-      navigate(`/orders/${orderId}`);
+      toast.success('Order(s) placed successfully!');
+      // Navigate to order history or the first new order?
+      // Since we might create multiple orders, let's go to the Orders list or Dashboard.
+      navigate('/buyer/dashboard?tab=orders');
     } catch (error) {
-      toast.error('Failed to place order. Please try again.');
+       console.error("Checkout error:", error);
+      toast.error(error.message || 'Failed to place order. Please try again.');
     } finally {
       setIsProcessing(false);
     }

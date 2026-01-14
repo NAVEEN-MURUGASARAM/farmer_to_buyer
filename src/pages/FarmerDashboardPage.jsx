@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import StatsCards from '@/components/farmer/StatsCards';
 import RecentOrders from '@/components/farmer/RecentOrders';
 import MyListings from '@/components/farmer/MyListings';
+import AddProductForm from '@/components/farmer/AddProductForm';
 
 export default function FarmerDashboardPage() {
   const { user } = useAuthStore();
@@ -22,7 +23,10 @@ export default function FarmerDashboardPage() {
               <h1 className="text-3xl font-bold text-gray-900">Farmer Dashboard</h1>
               <p className="text-gray-600 mt-2">Welcome back, {user?.name}! 👨‍🌾</p>
             </div>
-            <Button className="bg-green-600 hover:bg-green-700">
+            <Button 
+              className="bg-green-600 hover:bg-green-700"
+              onClick={() => setActiveTab('add-product')}
+            >
               <Plus size={18} className="mr-2" />
               Add New Product
             </Button>
@@ -91,6 +95,11 @@ export default function FarmerDashboardPage() {
               <p className="text-gray-600">Orders list coming soon...</p>
             </CardContent>
           </Card>
+        )}
+
+        {/* Add Product Tab */}
+        {activeTab === 'add-product' && (
+           <AddProductForm setCurrentScreen={setActiveTab} />
         )}
       </div>
     </div>

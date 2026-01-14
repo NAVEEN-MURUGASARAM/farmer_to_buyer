@@ -1,5 +1,7 @@
 // src/pages/ProductsPage.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { productService } from '@/services/productService';
+import { useAuthStore } from '@/store';
 import ProductList from '@/components/products/ProductList';
 import FilterSection from '@/components/products/FilterSection';
 import SearchBar from '@/components/products/SearchBar';
@@ -7,15 +9,35 @@ import SearchBar from '@/components/products/SearchBar';
 export default function ProductsPage() {
   const [showFilters, setShowFilters] = useState(true);
 
-  // Mock products data
-  const mockProducts = [
-    { id: 1, name: 'Organic Spinach', price: 45, image: '🥬', category: 'Vegetables', rating: 4.8 },
-    { id: 2, name: 'Fresh Tomatoes', price: 60, image: '🍅', category: 'Vegetables', rating: 4.7 },
-    { id: 3, name: 'Carrots Bundle', price: 50, image: '🥕', category: 'Vegetables', rating: 4.9 },
-    { id: 4, name: 'Fresh Apples', price: 80, image: '🍎', category: 'Fruits', rating: 4.8 },
-    { id: 5, name: 'Bananas', price: 40, image: '🍌', category: 'Fruits', rating: 4.6 },
-    { id: 6, name: 'Fresh Milk', price: 65, image: '🥛', category: 'Dairy', rating: 4.9 },
-  ];
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const { userRole, token } = useAuthStore();
+
+  useEffect(() => {
+    fetchProducts();
+  }, [userRole]); // Re-fetch if role changes
+
+  const fetchProducts = async () => {
+    setIsLoading(true);
+    try {
+      let data;
+      // Fetch based on role
+      if (userRole === 'farmer') {
+        data = await productService.getMyProducts(token);
+      } else {
+        // Buyers and guests see all products
+        data = await productService.getAllProducts();
+      }
+      setProducts(data);
+    } catch (err) {
+      console.error("Failed to fetch products:", err);
+      setError("Failed to load products. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -34,7 +56,24 @@ export default function ProductsPage() {
 
           {/* Products */}
           <div className="lg:col-span-3">
-            <ProductList products={mockProducts} />
+            {isLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+                <p className="mt-4 text-gray-600">Loading fresh produce...</p>
+              </div>
+            ) : error ? (
+              <div className="text-center py-12 text-red-600">
+                <p>{error}</p>
+                <button 
+                  onClick={fetchProducts}
+                  className="mt-4 text-green-600 underline hover:text-green-700"
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : (
+              <ProductList products={products} />
+            )}
           </div>
         </div>
       </div>
