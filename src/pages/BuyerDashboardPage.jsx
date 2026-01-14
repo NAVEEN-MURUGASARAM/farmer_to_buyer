@@ -1,7 +1,7 @@
-// src/pages/BuyerDashboardPage.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore, useOrderStore, useCartStore, useAddressStore, useWishlistStore } from '@/store';
+import { orderService } from '@/services/orderService';
 import { ShoppingCart, Package, Heart, Settings, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,13 +9,27 @@ import { useToast } from '@/contexts/ToastContext';
 
 export default function BuyerDashboardPage() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
   const { items: cartItems, totalPrice, removeFromCart, updateQuantity: updateCartQuantity } = useCartStore();
-  const { orders } = useOrderStore();
+  const { orders, setOrders } = useOrderStore();
   const { addresses } = useAddressStore();
   const { items: wishlistItems } = useWishlistStore();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('overview');
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        if (token) {
+          const data = await orderService.getBuyerOrders(token);
+          setOrders(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch orders:", error);
+      }
+    };
+    fetchOrders();
+  }, [token, setOrders]);
 
   const stats = [
     { label: 'Total Orders', value: orders.length, icon: '📦' },
@@ -208,9 +222,17 @@ export default function BuyerDashboardPage() {
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-medium">Order #{order.order_number || order.id}</p>
-                          <p className="text-sm text-gray-600">
-                            {order.items?.length || 0} items
-                          </p>
+                          {order.items && order.items.length > 0 ? (
+                            <div className="mt-2 space-y-1">
+                              {order.items.map((item, idx) => (
+                                <p key={idx} className="text-sm text-gray-600">
+                                  • {item.product_name || item.name || item.crop_name || `Item ${idx + 1}`} x {item.quantity}
+                                </p>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-600">No items</p>
+                          )}
                         </div>
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-medium ${

@@ -76,8 +76,8 @@ const useCartStoreBase = create(
                             ...items,
                             {
                                 productId: product.id,
-                                name: product.name,
-                                price: product.price,
+                                name: product.name || product.crop_name,
+                                price: parseFloat(product.price || product.price_per_unit || 0),
                                 quantity,
                             },
                         ],
@@ -132,6 +132,8 @@ export const useOrderStore = create(
     persist(
         (set, get) => ({
             orders: [],
+
+            setOrders: (orders) => set({ orders }),
 
             addOrder: (order) => {
                 set((state) => ({

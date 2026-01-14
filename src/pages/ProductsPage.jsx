@@ -9,6 +9,14 @@ import SearchBar from '@/components/products/SearchBar';
 export default function ProductsPage() {
   const [showFilters, setShowFilters] = useState(true);
 
+  /* Search & Filter State */
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({
+    priceRange: 1000, // Max price
+    categories: [],
+    minRating: 0
+  });
+
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -39,19 +47,35 @@ export default function ProductsPage() {
     }
   };
 
+  const filteredProducts = products.filter(product => {
+    const name = (product.name || product.crop_name || '').toLowerCase();
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = name.includes(searchLower) || (product.category || '').toLowerCase().includes(searchLower);
+    
+    const price = parseFloat(product.price || product.price_per_unit || 0);
+    const matchesPrice = price <= filters.priceRange;
+    
+    const matchesCategory = filters.categories.length === 0 || filters.categories.includes(product.category); // Note: Backend needs to provide category
+    
+    const rating = product.rating || 0;
+    const matchesRating = rating >= filters.minRating;
+
+    return matchesSearch && matchesPrice && matchesCategory && matchesRating;
+  });
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Shop Fresh Produce</h1>
-          <SearchBar />
+          <SearchBar value={searchTerm} onChange={setSearchTerm} />
         </div>
 
         <div className="grid lg:grid-cols-4 gap-8">
           {/* Filters */}
           <div className="lg:col-span-1">
-            <FilterSection />
+            <FilterSection filters={filters} setFilters={setFilters} />
           </div>
 
           {/* Products */}
@@ -72,7 +96,7 @@ export default function ProductsPage() {
                 </button>
               </div>
             ) : (
-              <ProductList products={products} />
+              <ProductList products={filteredProducts} />
             )}
           </div>
         </div>

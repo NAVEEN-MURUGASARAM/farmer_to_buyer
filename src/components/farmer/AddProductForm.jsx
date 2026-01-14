@@ -1,8 +1,8 @@
 // src/components/farmer/AddProductForm.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { productService } from '@/services/productService';
 
-const AddProductForm = ({ setCurrentScreen }) => {
+const AddProductForm = ({ setCurrentScreen, initialData = null, isEditMode = false }) => {
   const [formData, setFormData] = useState({
     crop_name: '',
     unit: '',
@@ -14,6 +14,20 @@ const AddProductForm = ({ setCurrentScreen }) => {
   });
 
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (initialData && isEditMode) {
+      setFormData({
+        crop_name: initialData.crop_name || initialData.name || '',
+        unit: initialData.unit || '',
+        quantity: initialData.quantity || '',
+        price_per_unit: initialData.price_per_unit || initialData.price || '',
+        state: initialData.state || '',
+        city: initialData.city || '',
+        pincode: initialData.pincode || ''
+      });
+    }
+  }, [initialData, isEditMode]);
   
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,12 +46,23 @@ const AddProductForm = ({ setCurrentScreen }) => {
         pincode: formData.pincode
       };
 
-      await productService.createProduct(payload, token);
+      if (isEditMode && initialData?.id) {
+        await productService.updateProduct(initialData.id, payload, token);
+      } else {
+        await productService.createProduct(payload, token);
+      }
       
-      setCurrentScreen('listings'); 
+      // If setCurrentScreen is passed (Dashboard usage), use it. 
+      // Otherwise maybe we should redirect? The parent will handle success usually.
+      if (setCurrentScreen) {
+        setCurrentScreen('listings');
+      } else {
+        // Fallback for standalone page usage
+        window.history.back();
+      }
     } catch (error) {
-      console.error("Failed to create product:", error);
-      alert("Failed to create product. Please check your inputs.");
+      console.error("Failed to save product:", error);
+      alert("Failed to save product. Please check your inputs.");
     } finally {
       setIsLoading(false);
     }
@@ -45,7 +70,9 @@ const AddProductForm = ({ setCurrentScreen }) => {
 
   return (
     <div className="bg-white p-8 rounded-lg shadow-lg">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">Add New Listing</h1>
+      <h1 className="text-3xl font-bold mb-6 text-gray-800">
+        {isEditMode ? 'Edit Product' : 'Add New Listing'}
+      </h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
@@ -142,7 +169,10 @@ const AddProductForm = ({ setCurrentScreen }) => {
         <div className="flex gap-4 pt-4">
           <button
             type="button"
-            onClick={() => setCurrentScreen('farmer-dashboard')}
+            onClick={() => {
+              if (setCurrentScreen) setCurrentScreen('listings');
+              else window.history.back();
+            }}
             className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-semibold"
           >
             Cancel
@@ -152,7 +182,7 @@ const AddProductForm = ({ setCurrentScreen }) => {
             disabled={isLoading}
             className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold disabled:opacity-50"
           >
-            {isLoading ? 'Publishing...' : 'Publish Listing'}
+            {isLoading ? 'Saving...' : (isEditMode ? 'Update Product' : 'Publish Listing')}
           </button>
         </div>
       </form>

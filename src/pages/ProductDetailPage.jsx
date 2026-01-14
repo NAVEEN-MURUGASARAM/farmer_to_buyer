@@ -1,10 +1,11 @@
 // src/pages/ProductDetailPage.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Star, Heart, Share2, Truck, Shield } from 'lucide-react';
+import { Star, Heart, Share2, Truck, Shield, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useCartStore, useWishlistStore } from '@/store';
+import { useAuthStore, useCartStore, useWishlistStore } from '@/store';
 import { useToast } from '@/contexts/ToastContext';
+import { productService } from '@/services/productService';
 import RatingStars from '@/components/reviews/RatingStars';
 import ReviewList from '@/components/reviews/ReviewList';
 import ReviewForm from '@/components/reviews/ReviewForm';
@@ -15,82 +16,129 @@ export default function ProductDetailPage() {
   const navigate = useNavigate();
   const [quantity, setQuantity] = useState(1);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  
+  const [product, setProduct] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const { addToCart } = useCartStore();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
+  const { userRole, token } = useAuthStore();
   const toast = useToast();
 
-  // Mock product data
-  const product = {
-    id,
-    name: 'Fresh Organic Spinach',
-    price: 120,
-    originalPrice: 180,
-    rating: 4.8,
-    reviews: 234,
-    image: '🥬',
-    category: 'Vegetables',
-    description: 'Fresh, organic spinach harvested today. Rich in iron and nutrients.',
-    farmers: [
-      { id: 1, name: 'Ram Sharma', location: 'Karnataka', rating: 4.9 },
-      { id: 2, name: 'Priya Singh', location: 'Punjab', rating: 4.7 },
-    ],
-    certifications: ['Organic', 'Fair Trade', 'Pesticide Free'],
-    storage: 'Keep in refrigerator, consume within 3 days',
-    nutritionPer100g: {
-      calories: 23,
-      protein: '2.9g',
-      carbs: '3.6g',
-      fiber: '2.2g',
-    },
+  useEffect(() => {
+    fetchProductDetails();
+  }, [id]);
+
+  const fetchProductDetails = async () => {
+    setIsLoading(true);
+    try {
+      const data = await productService.getProductById(id);
+      setProduct(data);
+    } catch (err) {
+      console.error("Failed to load product:", err);
+      setError("Product not found or failed to load.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Mock reviews data
-  const reviews = [
-    {
-      id: 1,
-      buyer_name: 'Rajesh Kumar',
-      rating: 5,
-      title: 'Excellent Quality',
-      comment: 'Very fresh and organic. Highly recommended!',
-      is_verified_purchase: true,
-      created_at: '2024-12-20T10:00:00Z',
-      helpful_count: 12,
-    },
-    {
-      id: 2,
-      buyer_name: 'Priya Singh',
-      rating: 4,
-      title: 'Good Product',
-      comment: 'Good quality produce, delivered on time.',
-      is_verified_purchase: true,
-      created_at: '2024-12-19T14:30:00Z',
-      helpful_count: 8,
-    },
-  ];
-
-  const inWishlist = isInWishlist(product.id);
-
   const handleAddToCart = () => {
-    addToCart(product, quantity);
+    if (!product) return;
+    // Map backend fields to cart item structure if needed, or pass full object
+    const cartItem = {
+      id: product.id,
+      name: product.crop_name || product.name,
+      price: product.price_per_unit || product.price,
+      image: product.image,
+      ...product
+    };
+    addToCart(cartItem, quantity);
     toast.success('Added to cart!');
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this product?")) return;
+    try {
+      await productService.deleteProduct(product.id, token);
+      toast.success("Product deleted successfully");
+      navigate('/farmer/dashboard'); 
+    } catch (error) {
+      console.error("Failed to delete product:", error);
+      toast.error("Failed to delete product");
+    }
+  };
+
+  const handleEdit = () => {
+    navigate(`/farmer/edit-product/${product.id}`);
+  };
+
   const handleWishlistToggle = () => {
-    if (inWishlist) {
+    if (!product) return;
+    const item = {
+      id: product.id,
+      name: product.crop_name || product.name,
+      price: product.price_per_unit || product.price,
+      image: product.image,
+      ...product
+    };
+
+    if (isInWishlist(product.id)) {
       removeFromWishlist(product.id);
       toast.success('Removed from wishlist');
     } else {
-      addToWishlist(product);
+      addToWishlist(item);
       toast.success('Added to wishlist');
     }
   };
 
   const handleReviewSubmit = async (reviewData) => {
-    // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
     toast.success('Review submitted successfully!');
     setShowReviewForm(false);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading product details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Oops!</h2>
+          <p className="text-gray-600 mb-4">{error || "Product not found"}</p>
+          <Button onClick={() => navigate('/products')}>Back to Products</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Derived / Fallback data
+  const productName = product.crop_name || product.name || "Unknown Product";
+  const productPrice = product.price_per_unit || product.price || 0;
+  const productUnit = product.unit || 'kg';
+  const displayImage = product.image || "🥬";
+  const rating = product.rating || 4.5;
+  const reviewCount = product.reviews || 0;
+  const inWishlist = isInWishlist(product.id);
+
+  // Fallback for missing backend fields
+  const nutrition = product.nutritionPer100g || {
+    calories: '23',
+    protein: '2.9g',
+    carbs: '3.6g',
+    fiber: '2.2g',
+  };
+  const certifications = product.certifications || ['Organic', 'Farm Fresh'];
+  const storageInfo = product.storage || 'Keep in simple storage';
 
   return (
     <div className="min-h-screen bg-white">
@@ -98,86 +146,104 @@ export default function ProductDetailPage() {
         <div className="grid md:grid-cols-2 gap-12 mb-12">
           {/* Product Image */}
           <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
-            <span className="text-9xl">{product.image}</span>
+            <span className="text-9xl">{displayImage}</span>
           </div>
 
           {/* Product Details */}
           <div className="space-y-6">
             <div>
-              <span className="text-sm text-green-600 font-semibold">{product.category}</span>
-              <h1 className="text-3xl font-bold text-gray-900 mt-2">{product.name}</h1>
+              <span className="text-sm text-green-600 font-semibold">{product.category || "Fresh Produce"}</span>
+              <h1 className="text-3xl font-bold text-gray-900 mt-2">{productName}</h1>
+              <p className="text-gray-500 text-sm mt-1">
+                From: {product.city}, {product.state} ({product.pincode})
+              </p>
             </div>
 
             {/* Rating */}
             <div className="flex items-center gap-4">
-              <RatingStars rating={product.rating} size={20} />
+              <RatingStars rating={rating} size={20} />
               <span className="text-gray-600">
-                {product.rating} ({product.reviews} reviews)
+                {rating} ({reviewCount} reviews)
               </span>
             </div>
 
             {/* Price */}
             <div className="space-y-2">
               <div className="flex items-end gap-3">
-                <span className="text-4xl font-bold text-gray-900">₹{product.price}</span>
-                <span className="text-lg text-gray-500 line-through">₹{product.originalPrice}</span>
-                <span className="text-green-600 font-semibold">
-                  {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% off
-                </span>
+                <span className="text-4xl font-bold text-gray-900">₹{productPrice}</span>
+                <span className="text-lg text-gray-500">/{productUnit}</span>
               </div>
+              <p className="text-sm text-gray-600">Available Stock: {product.quantity} {productUnit}</p>
             </div>
 
-            {/* Quantity Selector */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-10 h-10 border border-gray-300 rounded hover:bg-gray-100"
-                >
-                  −
-                </button>
-                <span className="text-xl font-semibold w-8 text-center">{quantity}</span>
-                <button
-                  onClick={() => setQuantity(quantity + 1)}
-                  className="w-10 h-10 border border-gray-300 rounded hover:bg-gray-100"
-                >
-                  +
-                </button>
+            {/* Quantity Selector - HIDE for Farmers */}
+            {userRole !== 'farmer' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Quantity ({productUnit})</label>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="w-10 h-10 border border-gray-300 rounded hover:bg-gray-100"
+                  >
+                    −
+                  </button>
+                  <span className="text-xl font-semibold w-8 text-center">{quantity}</span>
+                  <button
+                    onClick={() => setQuantity(Math.min(product.quantity, quantity + 1))}
+                    className="w-10 h-10 border border-gray-300 rounded hover:bg-gray-100"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-3">
-              <Button
-                onClick={handleAddToCart}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white h-12 text-lg"
-              >
-                Add to Cart
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className={`w-12 h-12 ${inWishlist ? 'text-red-600 border-red-300' : ''}`}
-                onClick={handleWishlistToggle}
-              >
-                <Heart size={20} className={inWishlist ? 'fill-red-600' : ''} />
-              </Button>
+              {userRole === 'farmer' ? (
+                /* Farmer Actions */
+                <>
+                  <Button
+                    onClick={handleEdit}
+                    variant="outline"
+                    className="flex-1 h-12 text-lg border-green-600 text-green-600 hover:bg-green-50"
+                  >
+                    <Edit size={20} className="mr-2" /> Edit Product
+                  </Button>
+                  <Button
+                    onClick={handleDelete}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white h-12 text-lg"
+                  >
+                    <Trash2 size={20} className="mr-2" /> Delete Product
+                  </Button>
+                </>
+              ) : (
+                /* Buyer Actions */
+                <>
+                  <Button
+                    onClick={handleAddToCart}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white h-12 text-lg"
+                  >
+                    Add to Cart
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className={`w-12 h-12 ${inWishlist ? 'text-red-600 border-red-300' : ''}`}
+                    onClick={handleWishlistToggle}
+                  >
+                    <Heart size={20} className={inWishlist ? 'fill-red-600' : ''} />
+                  </Button>
+                </>
+              )}
+              
               <Button
                 variant="outline"
                 size="lg"
                 className="w-12 h-12"
                 onClick={() => {
-                  if (navigator.share) {
-                    navigator.share({
-                      title: product.name,
-                      text: `Check out ${product.name} on FarmerToBuyer!`,
-                      url: window.location.href,
-                    });
-                  } else {
-                    navigator.clipboard.writeText(window.location.href);
-                    toast.success('Link copied to clipboard!');
-                  }
+                  navigator.clipboard.writeText(window.location.href);
+                  toast.success('Link copied to clipboard!');
                 }}
               >
                 <Share2 size={20} />
@@ -210,7 +276,7 @@ export default function ProductDetailPage() {
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Certifications</h3>
               <div className="space-y-2">
-                {product.certifications.map((cert) => (
+                {certifications.map((cert) => (
                   <div key={cert} className="flex items-center gap-2">
                     <span className="text-green-600">✓</span>
                     <p className="text-gray-600">{cert}</p>
@@ -221,16 +287,16 @@ export default function ProductDetailPage() {
 
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Storage</h3>
-              <p className="text-gray-600">{product.storage}</p>
+              <p className="text-gray-600">{storageInfo}</p>
             </div>
 
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Nutrition (per 100g)</h3>
               <div className="space-y-2 text-sm">
-                <p className="text-gray-600">Calories: {product.nutritionPer100g.calories}</p>
-                <p className="text-gray-600">Protein: {product.nutritionPer100g.protein}</p>
-                <p className="text-gray-600">Carbs: {product.nutritionPer100g.carbs}</p>
-                <p className="text-gray-600">Fiber: {product.nutritionPer100g.fiber}</p>
+                <p className="text-gray-600">Calories: {nutrition.calories}</p>
+                <p className="text-gray-600">Protein: {nutrition.protein}</p>
+                <p className="text-gray-600">Carbs: {nutrition.carbs}</p>
+                <p className="text-gray-600">Fiber: {nutrition.fiber}</p>
               </div>
             </div>
           </div>
@@ -241,13 +307,15 @@ export default function ProductDetailPage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Customer Reviews</h2>
-              <p className="text-gray-600 mt-1">{reviews.length} reviews</p>
+              <p className="text-gray-600 mt-1">{reviewCount} reviews</p>
             </div>
-            <Button onClick={() => setShowReviewForm(true)} className="bg-green-600 hover:bg-green-700">
-              Write a Review
-            </Button>
+            {userRole !== 'farmer' && (
+              <Button onClick={() => setShowReviewForm(true)} className="bg-green-600 hover:bg-green-700">
+                Write a Review
+              </Button>
+            )}
           </div>
-          <ReviewList reviews={reviews} />
+          <ReviewList reviews={[]} /> {/* Using empty reviews for now as backend doesn't support them */}
         </div>
       </div>
 

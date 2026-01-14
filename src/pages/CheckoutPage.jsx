@@ -1,5 +1,5 @@
 // src/pages/CheckoutPage.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Truck, CreditCard, ArrowLeft } from 'lucide-react';
 import { useCartStore, useAddressStore, useOrderStore, useAuthStore } from '@/store';
@@ -22,7 +22,7 @@ export default function CheckoutPage() {
   const [selectedAddressId, setSelectedAddressId] = useState(
     addresses.find((addr) => addr.is_default)?.id || null
   );
-  const [deliveryMethod, setDeliveryMethod] = useState('self_delivery');
+  const [deliveryMethod, setDeliveryMethod] = useState('pickup');
   const [paymentMethod, setPaymentMethod] = useState('upi');
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -41,8 +41,10 @@ export default function CheckoutPage() {
   const shippingCharges = deliveryMethod === 'courier' ? 50 : deliveryMethod === 'pickup' ? 0 : 0;
   const finalTotal = totalPrice + shippingCharges;
 
+  const isOrderPlaced = useRef(false);
+
   useEffect(() => {
-    if (items.length === 0) {
+    if (items.length === 0 && !isOrderPlaced.current) {
       navigate('/products');
       toast.warning('Your cart is empty');
     }
@@ -90,20 +92,22 @@ export default function CheckoutPage() {
       const token = localStorage.getItem('authToken'); // Get fresh token
 
       // Create an order for each item in the cart
-      // The backend spec implies one order per product payload
       const orderPromises = items.map((item) => {
+        const pid = String(item.id || item.productId);
+        console.log("Creating order for product:", pid, "item:", item);
         return orderService.createOrder({
-          productId: item.productId,
-          quantity: item.quantity,
-          // We can optionally send address details if the backend supports it,
-          // but sticking to the minimal payload requested: productId, quantity.
-          // If the backend needs address, we might need to update the payload specs.
-          // For now, let's assume valid payload per user request.
+          product_id: pid,
+          quantity: parseInt(item.quantity),
+          delivery_mode: deliveryMethod,
+          address_id: selectedAddressId, // Send selected address ID
+          payment_method: paymentMethod, // Send selected payment method
+          status: "pending", 
         }, token);
       });
 
       await Promise.all(orderPromises);
-
+      
+      isOrderPlaced.current = true;
       clearCart();
       toast.success('Order(s) placed successfully!');
       // Navigate to order history or the first new order?
@@ -206,9 +210,9 @@ export default function CheckoutPage() {
               <CardContent>
                 <div className="space-y-3">
                   {[
-                    { value: 'self_delivery', label: 'Self Delivery', price: 'Free', desc: 'Delivered by farmer' },
+                    { value: 'pickup', label: 'Self Delivery', price: 'Free', desc: 'Delivered by farmer' },
                     { value: 'courier', label: 'Courier', price: '₹50', desc: 'Delivered via courier service' },
-                    { value: 'pickup', label: 'Pickup from Farm', price: 'Free', desc: 'Collect from farmer location' },
+                    { value: 'farm_pickup', label: 'Pickup from Farm', price: 'Free', desc: 'Collect from farmer location' },
                   ].map((method) => (
                     <div
                       key={method.value}

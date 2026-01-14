@@ -1,6 +1,6 @@
-// src/pages/FarmerDashboardPage.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store';
+import { orderService } from '@/services/orderService';
 import { BarChart3, Plus, Package, TrendingUp, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +10,23 @@ import MyListings from '@/components/farmer/MyListings';
 import AddProductForm from '@/components/farmer/AddProductForm';
 
 export default function FarmerDashboardPage() {
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
   const [activeTab, setActiveTab] = useState('overview');
+  const [orders, setOrders] = useState([]);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+        try {
+            if (token) {
+                const data = await orderService.getFarmerOrders(token);
+                setOrders(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch farmer orders:", error);
+        }
+    };
+    fetchOrders();
+  }, [token]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -77,7 +92,7 @@ export default function FarmerDashboardPage() {
         {activeTab === 'overview' && (
           <div className="space-y-8">
             <StatsCards />
-            <RecentOrders />
+            <RecentOrders orders={orders} />
           </div>
         )}
 

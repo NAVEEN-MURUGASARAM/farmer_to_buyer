@@ -17,6 +17,7 @@ import RegisterPage from "@/pages/RegisterPage";
 import ProductsPage from "@/pages/ProductsPage";
 import ProductDetailPage from "@/pages/ProductDetailPage";
 import FarmerDashboardPage from "@/pages/FarmerDashboardPage";
+import EditProductPage from "@/pages/EditProductPage";
 import BuyerDashboardPage from "@/pages/BuyerDashboardPage";
 import AboutPage from "@/pages/AboutPage";
 import ContactPage from "@/pages/ContactPage";
@@ -163,6 +164,14 @@ export default function App() {
               element={
                 <ProtectedRoute requiredRole="farmer">
                   <FarmerDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/farmer/edit-product/:id"
+              element={
+                <ProtectedRoute requiredRole="farmer">
+                  <EditProductPage />
                 </ProtectedRoute>
               }
             />

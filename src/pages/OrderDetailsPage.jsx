@@ -1,7 +1,7 @@
 // src/pages/OrderDetailsPage.jsx
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Package, Truck, MapPin, CreditCard, Calendar } from 'lucide-react';
-import { useOrderStore, useAuthStore } from '@/store';
+import { useOrderStore, useAuthStore, useAddressStore } from '@/store';
 import { useToast } from '@/contexts/ToastContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,13 +23,14 @@ export default function OrderDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { orders, cancelOrder } = useOrderStore();
+  const { addresses } = useAddressStore();
   const { userRole } = useAuthStore();
   const toast = useToast();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-  const order = orders.find((o) => o.id === id || o.order_number === id);
+  const rawOrder = orders.find((o) => o.id === id || o.order_number === id);
 
-  if (!order) {
+  if (!rawOrder) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="max-w-md w-full">
@@ -46,8 +47,33 @@ export default function OrderDetailsPage() {
     );
   }
 
-  const currentStatusIndex = statusSteps.indexOf(order.order_status);
-  const canCancel = order.order_status === 'pending' || order.order_status === 'confirmed';
+  // Normalization
+  const addressObj = rawOrder.address_id ? addresses.find(a => a.id === rawOrder.address_id) : null;
+  const formattedAddress = addressObj 
+      ? `${addressObj.fullName || ''}, ${addressObj.street || addressObj.address_line1 || ''}, ${addressObj.city}, ${addressObj.state} - ${addressObj.zipCode || addressObj.zip_code}`
+      : rawOrder.shipping_address || 'Not specified';
+
+  const order = {
+      ...rawOrder,
+      order_number: rawOrder.order_number || rawOrder.id,
+      shipping_address: formattedAddress,
+      delivery_method: rawOrder.delivery_method || rawOrder.delivery_mode,
+      payment_method: rawOrder.payment_method || 'N/A',
+      items: rawOrder.items && rawOrder.items.length > 0 ? rawOrder.items : [{
+          product_name: rawOrder.product_name || rawOrder.crop_name || rawOrder.name || 'Product',
+          quantity: rawOrder.quantity || 1,
+          unit_price: rawOrder.unit_price || rawOrder.price_per_unit || (rawOrder.total_amount ? rawOrder.total_amount / (rawOrder.quantity || 1) : 0),
+          total_price: rawOrder.total_amount || 0
+      }],
+      subtotal: rawOrder.subtotal || rawOrder.total_amount || 0,
+      shipping_charges: rawOrder.shipping_charges || 0,
+      total_amount: rawOrder.total_amount || 0
+  };
+
+  /* Safe status access */
+  const currentStatus = (order.order_status || order.status || 'pending').toLowerCase();
+  const currentStatusIndex = statusSteps.indexOf(currentStatus);
+  const canCancel = currentStatus === 'pending' || currentStatus === 'confirmed';
 
   const handleCancel = () => {
     cancelOrder(order.id);
@@ -118,9 +144,9 @@ export default function OrderDetailsPage() {
             </div>
             <div className="mt-6">
               <span
-                className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[order.order_status]}`}
+                className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[currentStatus] || statusColors.pending}`}
               >
-                {order.order_status.toUpperCase()}
+                {currentStatus.toUpperCase()}
               </span>
             </div>
           </CardContent>
