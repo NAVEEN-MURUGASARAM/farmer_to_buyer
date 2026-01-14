@@ -25,8 +25,11 @@ const useAuthStoreBase = create(
                     token: null,
                     error: null,
                 });
+                // Clear all auth-related localStorage items
                 localStorage.removeItem('authToken');
                 localStorage.removeItem('authUser');
+                // Clear zustand persisted storage
+                localStorage.removeItem('auth-storage');
             },
         }),
         {

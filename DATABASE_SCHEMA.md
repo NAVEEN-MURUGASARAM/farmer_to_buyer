@@ -713,3 +713,4 @@ ORDER BY month DESC;
 8. **Payment gateway integration** - Razorpay, Stripe, etc.
 9. **Inventory management** - Advanced stock tracking
 10. **Shipping integration** - Direct integration with courier services
+

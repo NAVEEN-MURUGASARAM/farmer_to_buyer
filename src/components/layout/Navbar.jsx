@@ -16,7 +16,7 @@ export default function Navbar() {
     logout();
     localStorage.removeItem('authToken');
     localStorage.removeItem('authUser');
-    navigate('/');
+    navigate('/auth');
   };
 
   const toggleMenu = () => {

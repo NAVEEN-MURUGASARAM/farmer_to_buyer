@@ -10,6 +10,7 @@ import { useAuthStore } from "@/store";
 
 // Pages
 import HomePage from "@/pages/HomePage";
+import AuthPage from "@/pages/AuthPage";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 import ProductsPage from "@/pages/ProductsPage";
@@ -34,7 +35,7 @@ function ProtectedRoute({ children, requiredRole = null }) {
   const { isAuthenticated, userRole } = useAuthStore();
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/auth" replace />;
   }
 
   if (requiredRole && userRole !== requiredRole) {
@@ -45,7 +46,7 @@ function ProtectedRoute({ children, requiredRole = null }) {
 }
 
 export default function App() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, setUser, setUserRole, setToken } = useAuthStore();
 
   useEffect(() => {
     // Initialize auth state from localStorage on app load
@@ -53,37 +54,97 @@ export default function App() {
     const storedUser = localStorage.getItem("authUser");
 
     if (storedToken && storedUser) {
-      // This would typically validate the token with backend
-      // For now, we'll just restore the state
-      console.log("Restoring auth state from localStorage");
+      try {
+        const user = JSON.parse(storedUser);
+        // Restore auth state from localStorage
+        setUser(user);
+        setUserRole(user.role);
+        setToken(storedToken);
+      } catch (error) {
+        // If parsing fails, clear invalid data
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("authUser");
+      }
     }
-  }, []);
+  }, [setUser, setUserRole, setToken]);
 
   return (
     <Router>
       <div className="flex flex-col min-h-screen bg-white">
-        <Navbar />
+        {/* Only show Navbar and Footer for authenticated users */}
+        {isAuthenticated && <Navbar />}
 
         <main className="flex-grow">
           <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<HomePage />} />
-            <Route path="/products" element={<ProductsPage />} />
-            <Route path="/products/:id" element={<ProductDetailPage />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/contact" element={<ContactPage />} />
+            {/* Auth Route - Redirect if already logged in */}
+            <Route
+              path="/auth"
+              element={
+                isAuthenticated ? <Navigate to="/" replace /> : <AuthPage />
+              }
+            />
 
-            {/* Auth Routes - Redirect if already logged in */}
+            {/* Legacy auth routes - redirect to /auth */}
             <Route
               path="/login"
               element={
-                isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />
+                isAuthenticated ? (
+                  <Navigate to="/" replace />
+                ) : (
+                  <Navigate to="/auth" replace />
+                )
               }
             />
             <Route
               path="/register"
               element={
-                isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />
+                isAuthenticated ? (
+                  <Navigate to="/" replace />
+                ) : (
+                  <Navigate to="/auth" replace />
+                )
+              }
+            />
+
+            {/* Protected Routes - All internal pages require authentication */}
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <HomePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/products"
+              element={
+                <ProtectedRoute>
+                  <ProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/products/:id"
+              element={
+                <ProtectedRoute>
+                  <ProductDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/about"
+              element={
+                <ProtectedRoute>
+                  <AboutPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/contact"
+              element={
+                <ProtectedRoute>
+                  <ContactPage />
+                </ProtectedRoute>
               }
             />
 
@@ -152,7 +213,8 @@ export default function App() {
           </Routes>
         </main>
 
-        <Footer />
+        {/* Only show Footer for authenticated users */}
+        {isAuthenticated && <Footer />}
       </div>
     </Router>
   );
