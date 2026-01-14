@@ -1,80 +1,84 @@
 // src/components/auth/LoginForm.jsx
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, AlertCircle, Loader } from 'lucide-react';
-import { useAuthStore } from '@/store';
-import { useToast } from '@/contexts/ToastContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Phone, Lock, AlertCircle, Loader } from "lucide-react";
+import { useAuthStore } from "@/store";
+import { useToast } from "@/contexts/ToastContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { authApi } from "@/services/api";
 
 export default function LoginForm({ onSwitchMode }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { setUser, setUserRole, setToken, setError: setStoreError } = useAuthStore();
+  const { setUser, setUserRole, setToken, setError: setStoreError, logout } =
+    useAuthStore();
   const toast = useToast();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setIsLoading(true);
 
     try {
-      // Validate inputs
-      if (!email || !password) {
-        setError('Please fill in all fields');
+      // Basic validation
+      if (!phone || !password) {
+        setError("Please fill in all fields");
         setIsLoading(false);
         return;
       }
 
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        setError('Please enter a valid email');
+      if (!/^[0-9]{8,15}$/.test(phone)) {
+        setError("Please enter a valid phone number");
         setIsLoading(false);
         return;
       }
 
-      // Simulate API call - Replace with actual API
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Call backend login
+      const loginRes = await authApi.login({ phone, password });
+      const token = loginRes?.token;
 
-      // Mock user data - In production, this comes from backend
-      const mockUser = {
-        id: '1',
-        name: email.split('@')[0],
-        email,
-        role: email.includes('farmer') ? 'farmer' : 'buyer',
-      };
+      if (!token) {
+        throw new Error("No token returned from server");
+      }
 
-      const mockToken = 'mock-jwt-token-' + Date.now();
+      // Fetch profile to get user details and role
+      const profile = await authApi.me(token);
 
       // Store in Zustand
-      setUser(mockUser);
-      setUserRole(mockUser.role);
-      setToken(mockToken);
+      setUser(profile);
+      setUserRole(profile?.role);
+      setToken(token);
 
       // Store in localStorage for persistence
-      localStorage.setItem('authToken', mockToken);
-      localStorage.setItem('authUser', JSON.stringify(mockUser));
+      localStorage.setItem("authToken", token);
+      localStorage.setItem("authUser", JSON.stringify(profile));
 
-      toast.success('Login successful!');
+      toast.success("Login successful!");
 
       // Redirect to Home page after successful login
-      navigate('/');
+      navigate("/");
     } catch (err) {
-      const errorMsg = err.message || 'Login failed. Please try again.';
+      const errorMsg = err.message || "Login failed. Please try again.";
       setError(errorMsg);
       setStoreError(errorMsg);
       toast.error(errorMsg);
+
+      if (err.status === 401) {
+        logout();
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleDemoLogin = (role) => {
-    const demoEmail = role === 'farmer' ? 'farmer@demo.com' : 'buyer@demo.com';
-    setEmail(demoEmail);
-    setPassword('demo123');
+    const demoPhone = role === "farmer" ? "9999999999" : "8888888888";
+    setPhone(demoPhone);
+    setPassword("Password@123");
   };
 
   return (
@@ -86,19 +90,22 @@ export default function LoginForm({ onSwitchMode }) {
         </div>
       )}
 
-      {/* Email Input */}
+      {/* Phone Input */}
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-          Email Address
+        <label
+          htmlFor="phone"
+          className="block text-sm font-medium text-gray-700 mb-2"
+        >
+          Phone Number
         </label>
         <div className="relative">
-          <Mail className="absolute left-3 top-3 text-gray-400" size={18} />
+          <Phone className="absolute left-3 top-3 text-gray-400" size={18} />
           <Input
-            id="email"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            id="phone"
+            type="tel"
+            placeholder="Enter phone number"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
             className="pl-10 border-gray-300"
             disabled={isLoading}
             required

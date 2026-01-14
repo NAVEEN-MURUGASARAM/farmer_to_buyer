@@ -1,25 +1,26 @@
 // src/components/auth/RegisterForm.jsx
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, Loader, AlertCircle, CheckCircle } from 'lucide-react';
-import { useAuthStore } from '@/store';
-import { useToast } from '@/contexts/ToastContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { User, Phone, Lock, Loader, AlertCircle, CheckCircle } from "lucide-react";
+import { useAuthStore } from "@/store";
+import { useToast } from "@/contexts/ToastContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { authApi } from "@/services/api";
 
 export default function RegisterForm({ onSwitchMode }) {
   const [step, setStep] = useState(1); // 1: Role Selection, 2: Form, 3: Success
   const [role, setRole] = useState(null); // 'farmer' or 'buyer'
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
+    name: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { setUser, setUserRole, setToken } = useAuthStore();
+  const { setUser, setUserRole, setToken, logout } = useAuthStore();
   const toast = useToast();
 
   const handleInputChange = (e) => {
@@ -36,20 +37,16 @@ export default function RegisterForm({ onSwitchMode }) {
       setError('Name is required');
       return false;
     }
-    if (!formData.email.trim()) {
-      setError('Email is required');
+    if (!formData.phone.trim()) {
+      setError("Phone is required");
       return false;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      setError('Please enter a valid email');
-      return false;
-    }
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (!/^[0-9]{8,15}$/.test(formData.phone)) {
+      setError("Please enter a valid phone number");
       return false;
     }
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return false;
     }
     return true;
@@ -66,41 +63,53 @@ export default function RegisterForm({ onSwitchMode }) {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      if (!role) {
+        setError("Please select a role before continuing");
+        setIsLoading(false);
+        return;
+      }
 
-      // Mock user data
-      const newUser = {
-        id: Date.now().toString(),
+      // Call backend register
+      const registerRes = await authApi.register({
         name: formData.name,
-        email: formData.email,
+        phone: formData.phone,
+        password: formData.password,
         role,
-      };
+      });
 
-      const mockToken = 'mock-jwt-token-' + Date.now();
+      const token = registerRes?.token;
+      if (!token) {
+        throw new Error("No token returned from server");
+      }
+
+      // Fetch profile to get user details and role
+      const profile = await authApi.me(token);
 
       // Store in Zustand
-      setUser(newUser);
-      setUserRole(role);
-      setToken(mockToken);
+      setUser(profile);
+      setUserRole(profile?.role);
+      setToken(token);
 
       // Store in localStorage
-      localStorage.setItem('authToken', mockToken);
-      localStorage.setItem('authUser', JSON.stringify(newUser));
+      localStorage.setItem("authToken", token);
+      localStorage.setItem("authUser", JSON.stringify(profile));
 
-      toast.success('Account created successfully!');
+      toast.success("Account created successfully!");
 
       // Show success and redirect
       setStep(3);
 
       setTimeout(() => {
         // Redirect to Home page after successful signup
-        navigate('/');
-      }, 2000);
+        navigate("/");
+      }, 1200);
     } catch (err) {
-      const errorMsg = err.message || 'Registration failed. Please try again.';
+      const errorMsg = err.message || "Registration failed. Please try again.";
       setError(errorMsg);
       toast.error(errorMsg);
+      if (err.status === 401) {
+        logout();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -191,17 +200,17 @@ export default function RegisterForm({ onSwitchMode }) {
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
+            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+              Phone Number
             </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-3 text-gray-400" size={18} />
+              <Phone className="absolute left-3 top-3 text-gray-400" size={18} />
               <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                name="email"
-                value={formData.email}
+                id="phone"
+                type="tel"
+                placeholder="Enter phone number"
+                name="phone"
+                value={formData.phone}
                 onChange={handleInputChange}
                 className="pl-10 border-gray-300"
                 disabled={isLoading}

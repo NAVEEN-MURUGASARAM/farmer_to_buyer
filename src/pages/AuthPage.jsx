@@ -1,7 +1,6 @@
 // src/pages/AuthPage.jsx
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { LogIn, UserPlus, ArrowRight } from "lucide-react";
+ import { LogIn, UserPlus } from "lucide-react";
 import {
   Card,
   CardContent,

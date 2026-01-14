@@ -7,6 +7,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { useAuthStore } from "@/store";
+import { authApi } from "@/services/api";
 
 // Pages
 import HomePage from "@/pages/HomePage";
@@ -46,27 +47,35 @@ function ProtectedRoute({ children, requiredRole = null }) {
 }
 
 export default function App() {
-  const { isAuthenticated, setUser, setUserRole, setToken } = useAuthStore();
+  const { isAuthenticated, setUser, setUserRole, setToken, logout } =
+    useAuthStore();
 
   useEffect(() => {
-    // Initialize auth state from localStorage on app load
-    const storedToken = localStorage.getItem("authToken");
-    const storedUser = localStorage.getItem("authUser");
+    const initAuth = async () => {
+      const storedToken = localStorage.getItem("authToken");
+      const storedUser = localStorage.getItem("authUser");
 
-    if (storedToken && storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        // Restore auth state from localStorage
-        setUser(user);
-        setUserRole(user.role);
-        setToken(storedToken);
-      } catch (error) {
-        // If parsing fails, clear invalid data
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("authUser");
+      if (!storedToken) {
+        return;
       }
-    }
-  }, [setUser, setUserRole, setToken]);
+
+      try {
+        // Validate token via /me
+        const profile = await authApi.me(storedToken);
+        setUser(profile);
+        setUserRole(profile?.role);
+        setToken(storedToken);
+
+        // keep localStorage in sync
+        localStorage.setItem("authUser", JSON.stringify(profile));
+      } catch (error) {
+        // If token invalid, clear auth
+        logout();
+      }
+    };
+
+    initAuth();
+  }, [logout, setToken, setUser, setUserRole]);
 
   return (
     <Router>

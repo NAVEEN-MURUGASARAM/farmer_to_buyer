@@ -10,4 +10,17 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://hon-puma-farmer-portal-46bc3459.koyeb.app',
+        changeOrigin: true,
+        secure: false,
+        headers: {
+          Origin: 'https://hon-puma-farmer-portal-46bc3459.koyeb.app',
+          Referer: 'https://hon-puma-farmer-portal-46bc3459.koyeb.app/',
+        },
+      },
+    },
+  },
 })
