@@ -1,5 +1,6 @@
 // src/pages/WishlistPage.jsx
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { Heart, ShoppingCart, ArrowLeft } from 'lucide-react';
 import { useWishlistStore, useCartStore } from '@/store';
 import { useToast } from '@/contexts/ToastContext';
@@ -73,7 +74,11 @@ export default function WishlistPage() {
               <Card key={item.productId} className="group hover:shadow-lg transition">
                 <CardContent className="p-0">
                   <div className="aspect-square bg-gray-100 flex items-center justify-center relative overflow-hidden">
-                    <span className="text-6xl">{item.image || '📦'}</span>
+                    {item.image && item.image.startsWith('http') ? (
+                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                       <span className="text-6xl">{item.image || '📦'}</span>
+                    )}
                     <button
                       onClick={() => handleRemove(item.productId)}
                       className="absolute top-2 right-2 p-2 bg-white rounded-full shadow hover:bg-red-50 transition opacity-0 group-hover:opacity-100"

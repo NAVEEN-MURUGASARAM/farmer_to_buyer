@@ -1,6 +1,7 @@
 // src/components/products/ProductCard.jsx
 import { ShoppingCart, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore, useCartStore, useWishlistStore } from '@/store';
 import { useToast } from '@/contexts/ToastContext';
@@ -12,6 +13,7 @@ export default function ProductCard({ product }) {
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
   const toast = useToast();
   const inWishlist = isInWishlist(product.id);
+  const [imgError, setImgError] = useState(false);
 
   const handleAddToCart = (e) => {
     e.preventDefault();
@@ -34,7 +36,17 @@ export default function ProductCard({ product }) {
     <div className="bg-white rounded-lg border border-gray-200 hover:shadow-lg transition overflow-hidden group">
       {/* Image */}
       <div className="bg-gray-100 h-48 flex items-center justify-center relative overflow-hidden">
-        <span className="text-6xl group-hover:scale-110 transition">{product.image || "🥬"}</span>
+        {!imgError && product.image && product.image.startsWith('http') ? (
+            <img 
+              src={product.image} 
+              alt={product.name} 
+              className="w-full h-full object-cover group-hover:scale-110 transition"
+              onError={() => setImgError(true)} 
+            />
+        ) : (
+            <span className="text-6xl group-hover:scale-110 transition">{product.image && !product.image.startsWith('http') ? product.image : "🥬"}</span>
+        )}
+        
         <button
           onClick={handleWishlistToggle}
           className={`absolute top-2 right-2 p-2 bg-white rounded-full shadow hover:bg-gray-100 transition ${

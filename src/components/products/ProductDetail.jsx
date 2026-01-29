@@ -36,11 +36,22 @@ const ProductDetail = ({ product }) => {
     alert("Edit functionality coming soon!");
   };
 
+  const [imgError, setImgError] = useState(false);
+
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
       <div className="grid md:grid-cols-2 gap-8 p-8">
-        <div className="bg-gradient-to-br from-green-100 to-green-200 rounded-lg p-16 flex items-center justify-center">
-          <div className="text-9xl">{product.image || "🥬"}</div>
+        <div className="bg-gradient-to-br from-green-100 to-green-200 rounded-lg p-16 flex items-center justify-center relative overflow-hidden">
+          {!imgError && product.image && product.image.startsWith('http') ? (
+             <img 
+               src={product.image} 
+               alt={product.name} 
+               className="absolute inset-0 w-full h-full object-cover"
+               onError={() => setImgError(true)} 
+             />
+          ) : (
+             <div className="text-9xl">{product.image && !product.image.startsWith('http') ? product.image : "🥬"}</div>
+          )}
         </div>
 
         <div>
