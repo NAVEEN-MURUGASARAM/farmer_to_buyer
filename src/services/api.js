@@ -1,5 +1,4 @@
-// Centralized API service for the frontend
-const API_BASE_URL = import.meta.env.VITE_NEXT_PUBLIC_API_URL || "https://farmer-buyer-backend-geda.onrender.com";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_NEXT_PUBLIC_API_URL || "https://farmer-buyer-backend-geda.onrender.com";
 
 
 const jsonHeaders = {

@@ -121,14 +121,13 @@ export default function LoginForm({ onSwitchMode }) {
         return;
       }
 
-      // Verify OTP using the dedicated endpoint with the temp token
-      const verifyRes = await authApi.verifyOtp({ tempToken, otp });
-      
-      // If the API returns a new token, use it. Otherwise, assume tempToken is now fully valid.
-      const token = verifyRes?.token || tempToken;
+      // Verify OTP by re-authenticating with OTP code
+      // This bypasses potential 404/400 errors on dedicated verify endpoints by using the standard login flow
+      const verifyRes = await authApi.login({ phone, password, otp });
+      const token = verifyRes?.token;
 
       if (!token) {
-        throw new Error("Verification failed: No token available");
+        throw new Error("Verification failed: Valid token not received");
       }
 
       // Decode token
@@ -137,7 +136,7 @@ export default function LoginForm({ onSwitchMode }) {
       
       const profile = {
         ...decoded,
-        role: verifyRes?.role || decoded?.role, // optional chaining in case verifyRes is just text
+        role: verifyRes.role || decoded?.role,
         phone: phone,
         name: decoded?.name || decoded?.sub || "User",
         is2faEnabled: true, // User just verified with OTP, so 2FA is enabled
