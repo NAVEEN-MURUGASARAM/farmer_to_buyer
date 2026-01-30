@@ -1,5 +1,8 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_NEXT_PUBLIC_API_URL || "https://farmer-buyer-backend-geda.onrender.com";
 
+console.log("Configured API Base URL:", API_BASE_URL);
+
+
 
 const jsonHeaders = {
   "Content-Type": "application/json",
