@@ -1,20 +1,29 @@
 // src/pages/ProfilePage.jsx
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, ArrowLeft, Save, Lock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { User, Mail, Phone, MapPin, ArrowLeft, Save, Lock, Shield } from 'lucide-react';
 import { useAuthStore } from '@/store';
 import { useToast } from '@/contexts/ToastContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import { authApi } from '@/services/api';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, setUser } = useAuthStore();
   const toast = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  
+  // 2FA State
+  const [show2faSetup, setShow2faSetup] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [otp, setOtp] = useState('');
+
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -30,6 +39,15 @@ export default function ProfilePage() {
     newPassword: '',
     confirmPassword: '',
   });
+
+  useEffect(() => {
+    // Check if we should auto-open 2FA setup
+    if (location.state?.open2faSetup && !user?.is2faEnabled && !show2faSetup) {
+        start2faSetup();
+        // Clear state to prevent re-triggering on refresh/updates
+        navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, user, show2faSetup, navigate]); // Added dependencies for safety
 
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
@@ -52,6 +70,60 @@ export default function ProfilePage() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const start2faSetup = async () => {
+    setIsSaving(true);
+    try {
+        const response = await authApi.generate2faSecret();
+        setQrCodeUrl(response);
+        setShow2faSetup(true);
+        setOtp('');
+    } catch(err) {
+        toast.error("Failed to start 2FA setup");
+    } finally {
+        setIsSaving(false);
+    }
+  };
+
+  const verifyAndEnable2fa = async () => {
+      if(!otp || otp.length !== 6) {
+          toast.error("Please enter a valid 6-digit code");
+          return;
+      }
+      setIsSaving(true);
+      try {
+          await authApi.enable2fa(otp);
+          // Update user state locally to reflect 2FA enabled
+          // In real app we might fetch user again, but here manual update
+          const updatedUser = { ...user, is2faEnabled: true };
+          setUser(updatedUser);
+          localStorage.setItem('authUser', JSON.stringify(updatedUser));
+          
+          toast.success("Two-Factor Authentication Enabled!");
+          setShow2faSetup(false);
+      } catch(err) {
+          toast.error(err.message || "Verification failed");
+      } finally {
+          setIsSaving(false);
+      }
+  };
+
+  const handleDisable2fa = async () => {
+      if(!window.confirm("Are you sure you want to disable 2FA? Your account will be less secure.")) return;
+      
+      setIsSaving(true);
+      try {
+          await authApi.disable2fa();
+           const updatedUser = { ...user, is2faEnabled: false };
+          setUser(updatedUser);
+          localStorage.setItem('authUser', JSON.stringify(updatedUser));
+          toast.success("Two-Factor Authentication Disabled");
+      } catch(err) {
+           toast.error("Failed to disable 2FA");
+      } finally {
+          setIsSaving(false);
+      }
   };
 
   const handlePasswordChange = async (e) => {
@@ -211,6 +283,80 @@ export default function ProfilePage() {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+
+          {/* Two-Factor Authentication */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="text-green-600" size={20} />
+                Two-Factor Authentication
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+               <div className="space-y-4">
+                   <div className="flex items-center justify-between">
+                       <div>
+                           <p className="font-medium text-gray-700">
+                               status: {' '}
+                               <span className={user?.is2faEnabled ? "text-green-600" : "text-gray-500"}>
+                                   {user?.is2faEnabled ? "Enabled" : "Disabled"}
+                               </span>
+                           </p>
+                           <p className="text-sm text-gray-500 mt-1">
+                               Adds an extra layer of security to your account using an authenticator app.
+                           </p>
+                       </div>
+                       
+                       {!user?.is2faEnabled ? (
+                           <Button onClick={start2faSetup} variant="outline" className="border-green-600 text-green-600 hover:bg-green-50">
+                               Enable 2FA
+                           </Button>
+                       ) : (
+                           <Button onClick={handleDisable2fa} variant="destructive">
+                               Disable 2FA
+                           </Button>
+                       )}
+                   </div>
+
+                   {/* 2FA Setup Section */}
+                   {show2faSetup && (
+                       <div className="mt-6 border-t pt-6">
+                           <h4 className="font-semibold mb-4">Set up Authenticator App</h4>
+                           <div className="flex flex-col md:flex-row gap-6 items-center">
+                               {qrCodeUrl && (
+                                   <div className="bg-white p-4 border rounded-lg flex justify-center">
+                                       <QRCodeSVG value={qrCodeUrl} size={180} level="M" includeMargin={true} />
+                                   </div>
+                               )}
+                               <div className="space-y-4 flex-1">
+                                    <p className="text-sm text-gray-600">
+                                        1. Install Microsoft Authenticator or Google Authenticator.<br/>
+                                        2. Scan the QR code.<br/>
+                                        3. Enter the 6-digit code below.
+                                    </p>
+                                    
+                                    <div className="flex gap-2">
+                                        <Input 
+                                            value={otp}
+                                            onChange={(e) => setOtp(e.target.value)}
+                                            placeholder="Enter 6-digit code" 
+                                            maxLength={6}
+                                            className="w-48 tracking-widest text-center"
+                                        />
+                                        <Button onClick={verifyAndEnable2fa} disabled={isSaving}>
+                                            {isSaving ? "Verifying..." : "Verify & Enable"}
+                                        </Button>
+                                    </div>
+                                    <Button variant="ghost" size="sm" onClick={() => setShow2faSetup(false)}>
+                                        Cancel
+                                    </Button>
+                               </div>
+                           </div>
+                       </div>
+                   )}
+               </div>
             </CardContent>
           </Card>
 

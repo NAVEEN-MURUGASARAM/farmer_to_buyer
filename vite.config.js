@@ -13,12 +13,12 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://hon-puma-farmer-portal-46bc3459.koyeb.app',
+        target: 'https://farmer-buyer-backend-geda.onrender.com',
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ''),
         headers: {
-          Origin: 'https://hon-puma-farmer-portal-46bc3459.koyeb.app',
-          Referer: 'https://hon-puma-farmer-portal-46bc3459.koyeb.app/',
+          Origin: 'https://farmer-buyer-backend-geda.onrender.com', // Optional: Render might not strict check origin but good practice
         },
       },
     },

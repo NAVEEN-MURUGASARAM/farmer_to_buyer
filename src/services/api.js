@@ -1,129 +1,132 @@
 // Centralized API service for the frontend
-// Support both Vite (import.meta.env) and Node-style (process.env) env vars.
-import { MOCK_USERS, MOCK_PRODUCTS, MOCK_ORDERS } from "../data/mockData";
-
-const API_BASE_URL = import.meta.env.VITE_NEXT_PUBLIC_API_URL || "";
-
+const API_BASE_URL = import.meta.env.VITE_NEXT_PUBLIC_API_URL || "https://farmer-buyer-backend-geda.onrender.com";
 
 const jsonHeaders = {
   "Content-Type": "application/json",
 };
 
-// Simulate network delay
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 async function fetchJson(path, { method = "GET", body, token } = {}) {
-  // const url = `${API_BASE_URL}${path}`;
+  const url = `${API_BASE_URL}${path}`;
 
-  console.log(`[MOCK API] ${method} ${path}`, body);
-  await delay(500); // Simulate latency
-
-  // --- Auth Routes ---
-  if (path === "/api/v1/auth/login") {
-    // Allow any login, but if it matches mock data returns specific role
-    // For demo, if 9876543210 -> Buyer, else Farmer (default)
-    if (body.phone === "9876543210") return MOCK_USERS.buyer;
-    return MOCK_USERS.farmer;
+  const headers = { ...jsonHeaders };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
-  if (path === "/api/v1/auth/register") {
-    if (body.role === 'buyer') return MOCK_USERS.buyer;
-    return MOCK_USERS.farmer;
-  }
+  const options = {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  };
 
-  if (path === "/api/v1/me") {
-    // Return based on token if we wanted to be strict, but for demo just return based on some heuristics or stored mock
-    // logic: checking token to decide which user to return
-    if (token === MOCK_USERS.buyer.token) return MOCK_USERS.buyer;
-    if (token === MOCK_USERS.farmer.token) return MOCK_USERS.farmer;
-    return MOCK_USERS.farmer; // Default fallback
-  }
+  try {
+    const response = await fetch(url, options);
 
-  // --- Product Routes ---
-  if (path === "/api/v1/products" && method === "GET") {
-    return MOCK_PRODUCTS;
-  }
-
-  if (path.startsWith("/api/v1/products/") && method === "GET") {
-    const id = path.split("/").pop();
-    if (id === 'me') { // /api/v1/products/me is for farmer's products
-      return MOCK_PRODUCTS.filter(p => p.farmer === "farmer-123");
+    // Handle empty responses (like 204 No Content)
+    if (response.status === 204) {
+      return null;
     }
-    return MOCK_PRODUCTS.find(p => p._id === id);
-  }
 
-  // Handle POST/PUT/DELETE for products (Mock success)
-  if (path === "/api/v1/products" && method === "POST") {
-    const newProduct = { ...body, _id: `new-${Date.now()}`, createdAt: new Date().toISOString() };
-    MOCK_PRODUCTS.push(newProduct); // In-memory update
-    return newProduct;
-  }
+    const contentType = response.headers.get("content-type");
+    let data;
 
-  if (path.startsWith("/api/v1/products/") && method === "DELETE") {
-    return { message: "Product deleted" };
-  }
-
-  if (path.startsWith("/api/v1/products/") && method === "PUT") {
-    return { ...body, _id: path.split("/").pop() };
-  }
-
-
-  // --- Order Routes ---
-  if (path === "/api/v1/orders" && method === "POST") {
-    // Create Order
-    const newOrder = {
-      _id: `order-${Date.now()}`,
-      ...body,
-      status: 'pending',
-      createdAt: new Date().toISOString()
+    if (contentType && contentType.includes("application/json")) {
+      data = await response.json().catch(() => null);
+    } else {
+      data = await response.text();
     }
-    MOCK_ORDERS.push(newOrder);
-    return newOrder;
+
+    if (!response.ok) {
+      // Create a more descriptive error message by stringifying data if it's an object
+      let errorMessage;
+      if (typeof data === 'object') {
+        errorMessage = JSON.stringify(data); // Force show all data
+      } else {
+        errorMessage = typeof data === 'string' ? data : `Request failed with status ${response.status}`;
+      }
+
+      console.error("API Error Details:", { status: response.status, url, data, errorMessage });
+      throw new Error(errorMessage);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("API Error:", error);
+    throw error;
   }
-
-  if (path === "/api/v1/orders/buyer/me") {
-    return MOCK_ORDERS;
-  }
-
-  if (path === "/api/v1/orders/farmer/me") {
-    return MOCK_ORDERS; // Return all for now or filter if needed
-  }
-
-  if (path.startsWith("/api/v1/orders/") && method === "GET") {
-    const id = path.split('/')[4]; // /api/v1/orders/:id
-    return MOCK_ORDERS.find(o => o._id === id);
-  }
-
-  if (path.startsWith("/api/v1/orders/") && path.endsWith("/status") && method === "PUT") {
-    return { message: "Order updated" };
-  }
-
-
-  // Default fallback
-  console.warn("Unhandled Mock Path:", path);
-  return null;
 }
 
-
 export const authApi = {
-  async login({ phone, password }) {
-    return fetchJson("/api/v1/auth/login", {
+  async login({ phone, password, otp }) { // Accept OTP
+    return fetchJson("/auth/login", {
       method: "POST",
-      body: { phone, password },
+      body: { phone, password, otp }, // send OTP if provided
+    });
+  },
+  async verifyOtp({ tempToken, otp }) {
+    // During login, we use the temporary token from the login response
+    // Pass it as Authorization header, similar to other authenticated requests
+    return fetchJson("/auth/2fa/verify", {
+      method: "POST",
+      body: { otp },
+      token: tempToken
     });
   },
   async register({ name, phone, password, role }) {
-    return fetchJson("/api/v1/auth/register", {
+    return fetchJson("/auth/register", {
       method: "POST",
       body: { name, phone, password, role },
     });
   },
+  // async me(token) {
+  //   return fetchJson("/me", {
+  //     method: "GET",
+  //     token,
+  //   });
+  // },
   async me(token) {
-    return fetchJson("/api/v1/me", {
-      method: "GET",
-      token,
+    // Endpoint broken/missing. Return null or throw. 
+    // For now, throwing prevents usage, but let's just return null so caller handles it?
+    // Actually, better to just error or let the caller rely on token decoding.
+    // We'll throw to ensure we don't use it.
+    throw new Error("User profile endpoint not available");
+  },
+  async generate2faSecret(token) {
+    // Typically needs auth token to identify user
+    // But if we use 'me' endpoint or similar, we need token
+    // The calling code (ProfilePage) should pass token or we use stored token
+    // Wait, earlier I assumed `fetchJson` handles token if passed. 
+    // I should update calls to pass token if needed.
+    // Or rely on a global token getter? 
+    // The `fetchJson` takes a token arg.
+    // Let's assume the component extracts token from store and passes it 
+    // OR we import store here (circular dependency risk).
+    // Best to let `fetchJson` accept token, and `authApi` methods accept token or wrapper does.
+
+    // Checking ProfilePage usage.. it calls `authApi.generate2faSecret()`. 
+    // Use logic: The user is logged in. Use `localStorage` or pass token.
+
+    const storedToken = localStorage.getItem('authToken');
+    return fetchJson("/auth/2fa/setup", {
+      method: "POST",
+      token: token || storedToken
     });
   },
+  async enable2fa(otp) {
+    const token = localStorage.getItem('authToken');
+    return fetchJson("/auth/2fa/verify", {
+      method: "POST",
+      body: { otp },
+      token
+    });
+  },
+  async disable2fa() {
+    const token = localStorage.getItem('authToken');
+    return fetchJson("/auth/2fa/disable", {
+      method: "POST",
+      token
+    });
+  }
 };
 
 export function withAuthHeaders(token) {
@@ -133,6 +136,14 @@ export function withAuthHeaders(token) {
       ...jsonHeaders,
     }
     : jsonHeaders;
+}
+
+export function parseJwt(token) {
+  try {
+    return JSON.parse(atob(token.split('.')[1]));
+  } catch (e) {
+    return null;
+  }
 }
 
 export { fetchJson };

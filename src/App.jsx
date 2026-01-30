@@ -37,10 +37,12 @@ function ProtectedRoute({ children, requiredRole = null }) {
   const { isAuthenticated, userRole } = useAuthStore();
 
   if (!isAuthenticated) {
+    console.log("ProtectedRoute: Not authenticated, redirecting to /auth");
     return <Navigate to="/auth" replace />;
   }
 
-  if (requiredRole && userRole !== requiredRole) {
+  if (requiredRole && userRole?.toLowerCase() !== requiredRole.toLowerCase()) {
+    console.log(`ProtectedRoute: Role mismatch. User: ${userRole}, Required: ${requiredRole}`);
     return <Navigate to="/" replace />;
   }
 
@@ -61,8 +63,29 @@ export default function App() {
       }
 
       try {
-        // Validate token via /me
-        const profile = await authApi.me(storedToken);
+        // Validate token via /me - Endpoint missing, so we decode locally
+        // const profile = await authApi.me(storedToken);
+        
+        const { parseJwt } = await import("@/services/api");
+        const decoded = parseJwt(storedToken);
+        
+        if (!decoded) {
+            throw new Error("Invalid token");
+        }
+        
+        // Check expiry if possible (exp is in seconds)
+        if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+            throw new Error("Token expired");
+        }
+
+        // Use stored user or construct from token
+        let profile = storedUser ? JSON.parse(storedUser) : {};
+        profile = {
+            ...profile,
+            ...decoded,
+            role: profile.role || decoded.role
+        };
+
         setUser(profile);
         setUserRole(profile?.role);
         setToken(storedToken);
@@ -70,6 +93,7 @@ export default function App() {
         // keep localStorage in sync
         localStorage.setItem("authUser", JSON.stringify(profile));
       } catch (error) {
+        console.error("Auth init failed:", error);
         // If token invalid, clear auth
         logout();
       }

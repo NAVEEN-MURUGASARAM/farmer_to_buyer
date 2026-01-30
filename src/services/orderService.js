@@ -3,7 +3,7 @@ import { fetchJson } from "./api";
 export const orderService = {
     // Create order (Buyer only)
     async createOrder(orderData, token) {
-        return fetchJson("/api/v1/orders", {
+        return fetchJson("/orders", {
             method: "POST",
             body: orderData,
             token,
@@ -12,7 +12,7 @@ export const orderService = {
 
     // Get order by ID
     async getOrderById(id, token) {
-        return fetchJson(`/api/v1/orders/${id}`, {
+        return fetchJson(`/orders/${id}`, {
             method: "GET",
             token,
         });
@@ -20,7 +20,7 @@ export const orderService = {
 
     // Get my orders (Buyer)
     async getBuyerOrders(token) {
-        return fetchJson("/api/v1/orders/buyer/me", {
+        return fetchJson("/orders/buyer/me", {
             method: "GET",
             token,
         });
@@ -28,7 +28,7 @@ export const orderService = {
 
     // Get my orders (Farmer)
     async getFarmerOrders(token) {
-        return fetchJson("/api/v1/orders/farmer/me", {
+        return fetchJson("/orders/farmer/me", {
             method: "GET",
             token,
         });
@@ -36,7 +36,7 @@ export const orderService = {
 
     // Update order status (Farmer only)
     async updateOrderStatus(id, status, token) {
-        return fetchJson(`/api/v1/orders/${id}/status`, {
+        return fetchJson(`/orders/${id}/status`, {
             method: "PUT",
             body: { status },
             token,

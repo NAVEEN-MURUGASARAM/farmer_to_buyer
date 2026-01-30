@@ -13,6 +13,12 @@ export default function LoginForm({ onSwitchMode }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  
+  // 2FA State
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [tempToken, setTempToken] = useState("");
+  const [otp, setOtp] = useState("");
+  
   const navigate = useNavigate();
   const { setUser, setUserRole, setToken, setError: setStoreError, logout } =
     useAuthStore();
@@ -39,14 +45,33 @@ export default function LoginForm({ onSwitchMode }) {
 
       // Call backend login
       const loginRes = await authApi.login({ phone, password });
+      
+      // Check if 2FA is required
+      if (loginRes?.twoFactorRequired) {
+        setTempToken(loginRes.token);
+        setRequires2FA(true);
+        setIsLoading(false);
+        toast.info("Please enter your 6-digit OTP code");
+        return;
+      }
+      
       const token = loginRes?.token;
 
       if (!token) {
         throw new Error("No token returned from server");
       }
 
-      // Fetch profile to get user details and role
-      const profile = await authApi.me(token);
+      // Decode token to get any available info
+      const { parseJwt } = await import("@/services/api");
+      const decoded = parseJwt(token);
+      
+      const profile = {
+        ...decoded,
+        role: loginRes.role || decoded?.role,
+        phone: phone,
+        name: decoded?.name || decoded?.sub || "User",
+        is2faEnabled: false, // If we're here without OTP, 2FA is not enabled
+      };      
 
       // Store in Zustand
       setUser(profile);
@@ -59,8 +84,17 @@ export default function LoginForm({ onSwitchMode }) {
 
       toast.success("Login successful!");
 
-      // Redirect to Home page after successful login
-      navigate("/");
+      // Redirect based on role
+      const role = profile.role?.trim().toUpperCase();
+      
+      if (role === 'FARMER') {
+        navigate('/farmer/dashboard');
+      } else if (role === 'BUYER') {
+        navigate('/buyer/dashboard');
+      } else {
+        console.warn("Unknown role:", role);
+        navigate('/');
+      }
     } catch (err) {
       const errorMsg = err.message || "Login failed. Please try again.";
       setError(errorMsg);
@@ -75,11 +109,145 @@ export default function LoginForm({ onSwitchMode }) {
     }
   };
 
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
+
+    try {
+      if (!otp || otp.length !== 6) {
+        setError("Please enter a valid 6-digit code");
+        setIsLoading(false);
+        return;
+      }
+
+      // Verify OTP using the dedicated endpoint with the temp token
+      const verifyRes = await authApi.verifyOtp({ tempToken, otp });
+      
+      // If the API returns a new token, use it. Otherwise, assume tempToken is now fully valid.
+      const token = verifyRes?.token || tempToken;
+
+      if (!token) {
+        throw new Error("Verification failed: No token available");
+      }
+
+      // Decode token
+      const { parseJwt } = await import("@/services/api");
+      const decoded = parseJwt(token);
+      
+      const profile = {
+        ...decoded,
+        role: verifyRes?.role || decoded?.role, // optional chaining in case verifyRes is just text
+        phone: phone,
+        name: decoded?.name || decoded?.sub || "User",
+        is2faEnabled: true, // User just verified with OTP, so 2FA is enabled
+      };
+
+      // Store in Zustand
+      setUser(profile);
+      setUserRole(profile?.role);
+      setToken(token);
+
+      // Store in localStorage
+      localStorage.setItem("authToken", token);
+      localStorage.setItem("authUser", JSON.stringify(profile));
+
+      toast.success("Login successful!");
+
+      // Redirect based on role
+      const role = profile.role?.trim().toUpperCase();
+      
+      if (role === 'FARMER') {
+        navigate('/farmer/dashboard');
+      } else if (role === 'BUYER') {
+        navigate('/buyer/dashboard');
+      } else {
+        navigate('/');
+      }
+    } catch (err) {
+      const errorMsg = err.message || "OTP verification failed";
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleDemoLogin = (role) => {
     const demoPhone = role === "farmer" ? "9999999999" : "8888888888";
     setPhone(demoPhone);
     setPassword("Password@123");
   };
+
+  // If 2FA is required, show OTP input form
+  if (requires2FA) {
+    return (
+      <form onSubmit={handleOtpSubmit} className="space-y-4">
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-3 flex gap-2">
+            <AlertCircle className="text-red-600 flex-shrink-0" size={18} />
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+
+        <div className="text-center mb-4">
+          <p className="text-sm text-gray-600">
+            A 6-digit code has been sent to your authenticator app.
+          </p>
+          <p className="text-sm font-medium text-gray-900 mt-1">
+            Enter the code to complete login
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
+            6-Digit Code
+          </label>
+          <Input
+            id="otp"
+            type="text"
+            placeholder="000000"
+            value={otp}
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+            maxLength={6}
+            className="text-center tracking-widest text-lg"
+            disabled={isLoading}
+            required
+            autoFocus
+          />
+        </div>
+
+        <Button
+          type="submit"
+          className="w-full bg-green-600 hover:bg-green-700 text-white"
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <>
+              <Loader size={18} className="animate-spin mr-2" />
+              Verifying...
+            </>
+          ) : (
+            'Verify & Login'
+          )}
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            setRequires2FA(false);
+            setOtp("");
+            setTempToken("");
+            setError("");
+          }}
+          className="w-full"
+        >
+          Back to Login
+        </Button>
+      </form>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">

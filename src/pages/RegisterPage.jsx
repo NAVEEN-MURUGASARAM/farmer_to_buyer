@@ -1,19 +1,21 @@
 // src/pages/RegisterPage.jsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, Loader, AlertCircle, CheckCircle } from 'lucide-react';
+import { User, Phone, Lock, Loader, AlertCircle, CheckCircle, Mail } from 'lucide-react';
 import { useAuthStore } from '@/store';
 import { useToast } from '@/contexts/ToastContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { authApi } from '@/services/api';
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1); // 1: Role Selection, 2: Form, 3: Success
   const [role, setRole] = useState(null); // 'farmer' or 'buyer'
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
+    phone: '',
+    email: '', // Optional or secondary
     password: '',
     confirmPassword: '',
   });
@@ -37,14 +39,20 @@ export default function RegisterPage() {
       setError('Name is required');
       return false;
     }
-    if (!formData.email.trim()) {
-      setError('Email is required');
+    if (!formData.phone.trim()) {
+      setError('Phone Number is required');
       return false;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      setError('Please enter a valid email');
+    if (!/^\d{10}$/.test(formData.phone)) {
+      setError('Please enter a valid 10-digit phone number');
       return false;
     }
+    // Email is optional, but if present validate it
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        setError('Please enter a valid email');
+        return false;
+    }
+
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters');
       return false;
@@ -67,27 +75,24 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Mock user data
-      const newUser = {
-        id: Date.now().toString(),
-        name: formData.name,
-        email: formData.email,
-        role,
-      };
-
+      
+      const user = await authApi.register({
+          name: formData.name,
+          phone: formData.phone,
+          password: formData.password,
+          role: role.toUpperCase()
+      });
+      // Mock token for immediate login
       const mockToken = 'mock-jwt-token-' + Date.now();
 
       // Store in Zustand
-      setUser(newUser);
+      setUser(user);
       setUserRole(role);
       setToken(mockToken);
 
       // Store in localStorage
       localStorage.setItem('authToken', mockToken);
-      localStorage.setItem('authUser', JSON.stringify(newUser));
+      localStorage.setItem('authUser', JSON.stringify(user));
 
       toast.success('Account created successfully!');
 
@@ -205,9 +210,29 @@ export default function RegisterPage() {
                 </div>
               </div>
 
+               <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 text-gray-400" size={18} />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="9876543210"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    className="pl-10 border-gray-300"
+                    disabled={isLoading}
+                    maxLength={10}
+                  />
+                </div>
+              </div>
+
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address
+                  Email Address <span className="text-gray-400 font-normal">(Optional)</span>
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 text-gray-400" size={18} />

@@ -53,7 +53,7 @@ export default function Navbar() {
             {isAuthenticated ? (
               <div className="flex items-center gap-4">
                 {/* Wishlist Icon - Only for Buyers */}
-                {userRole === 'buyer' && (
+                {userRole?.toLowerCase() === 'buyer' && (
                   <button
                     onClick={() => navigate('/wishlist')}
                     className="relative p-2 text-gray-700 hover:text-green-600 transition"
@@ -68,7 +68,7 @@ export default function Navbar() {
                 )}
 
                 {/* Cart Icon - Only for Buyers */}
-                {userRole === 'buyer' && (
+                {userRole?.toLowerCase() === 'buyer' && (
                   <button
                     onClick={() => navigate('/buyer/dashboard?tab=cart')}
                     className="relative p-2 text-gray-700 hover:text-green-600 transition"
@@ -96,7 +96,7 @@ export default function Navbar() {
 
                 {/* Dashboard Link */}
                 <Link
-                  to={userRole === 'farmer' ? '/farmer/dashboard' : '/buyer/dashboard'}
+                  to={userRole?.toLowerCase() === 'farmer' ? '/farmer/dashboard' : '/buyer/dashboard'}
                   className="hidden sm:inline text-sm text-gray-700 hover:text-green-600 transition"
                 >
                   Dashboard
@@ -164,7 +164,7 @@ export default function Navbar() {
             {isAuthenticated && (
               <>
                 <Link
-                  to={userRole === 'farmer' ? '/farmer/dashboard' : '/buyer/dashboard'}
+                  to={userRole?.toLowerCase() === 'farmer' ? '/farmer/dashboard' : '/buyer/dashboard'}
                   className="block py-2 text-gray-700 hover:text-green-600 transition sm:hidden"
                   onClick={() => setIsOpen(false)}
                 >

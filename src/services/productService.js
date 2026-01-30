@@ -3,21 +3,21 @@ import { fetchJson } from "./api";
 export const productService = {
     // Get all products
     async getAllProducts() {
-        return fetchJson("/api/v1/products", {
+        return fetchJson("/products", {
             method: "GET",
         });
     },
 
     // Get single product
     async getProductById(id) {
-        return fetchJson(`/api/v1/products/${id}`, {
+        return fetchJson(`/products/${id}`, {
             method: "GET",
         });
     },
 
     // Create product (Farmer only)
     async createProduct(productData, token) {
-        return fetchJson("/api/v1/products", {
+        return fetchJson("/products", {
             method: "POST",
             body: productData,
             token,
@@ -26,7 +26,7 @@ export const productService = {
 
     // Update product (Farmer only)
     async updateProduct(id, productData, token) {
-        return fetchJson(`/api/v1/products/${id}`, {
+        return fetchJson(`/products/${id}`, {
             method: "PUT",
             body: productData,
             token,
@@ -35,7 +35,7 @@ export const productService = {
 
     // Delete product (Farmer only)
     async deleteProduct(id, token) {
-        return fetchJson(`/api/v1/products/${id}`, {
+        return fetchJson(`/products/${id}`, {
             method: "DELETE",
             token,
         });
@@ -43,7 +43,7 @@ export const productService = {
 
     // Get my products (Farmer only)
     async getMyProducts(token) {
-        return fetchJson("/api/v1/products/me", {
+        return fetchJson("/products/me", {
             method: "GET",
             token,
         });

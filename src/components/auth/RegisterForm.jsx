@@ -70,46 +70,26 @@ export default function RegisterForm({ onSwitchMode }) {
       }
 
       // Call backend register
-      const registerRes = await authApi.register({
+      await authApi.register({
         name: formData.name,
         phone: formData.phone,
         password: formData.password,
-        role,
+        role: role.toUpperCase(),
       });
 
-      const token = registerRes?.token;
-      if (!token) {
-        throw new Error("No token returned from server");
-      }
-
-      // Fetch profile to get user details and role
-      const profile = await authApi.me(token);
-
-      // Store in Zustand
-      setUser(profile);
-      setUserRole(profile?.role);
-      setToken(token);
-
-      // Store in localStorage
-      localStorage.setItem("authToken", token);
-      localStorage.setItem("authUser", JSON.stringify(profile));
-
-      toast.success("Account created successfully!");
+      toast.success("Account created successfully! Please login.");
 
       // Show success and redirect
       setStep(3);
 
       setTimeout(() => {
-        // Redirect to Home page after successful signup
-        navigate("/");
-      }, 1200);
+        // Redirect to Login page after successful signup
+        navigate("/login");
+      }, 1500);
     } catch (err) {
       const errorMsg = err.message || "Registration failed. Please try again.";
       setError(errorMsg);
       toast.error(errorMsg);
-      if (err.status === 401) {
-        logout();
-      }
     } finally {
       setIsLoading(false);
     }

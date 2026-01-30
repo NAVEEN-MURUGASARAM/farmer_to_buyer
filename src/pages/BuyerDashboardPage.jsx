@@ -64,6 +64,30 @@ export default function BuyerDashboardPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* 2FA Alert */}
+        {!user?.is2faEnabled && (
+            <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="bg-blue-100 p-2 rounded-full">
+                         {/* Using Settings/Shield/Lock icon - Settings is imported (turn 251 line 5) */}
+                        <Settings className="text-blue-600 w-6 h-6" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-blue-800">Secure your account</h3>
+                        <p className="text-sm text-blue-600">Enable Two-Factor Authentication for enhanced security.</p>
+                    </div>
+                </div>
+                <Button 
+                    variant="outline" 
+                    className="border-blue-600 text-blue-600 hover:bg-blue-100"
+                    onClick={() => navigate('/profile', { state: { open2faSetup: true } })}
+                >
+                    Setup 2FA
+                </Button>
+            </div>
+        )}
+
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {stats.map((stat, index) => (
