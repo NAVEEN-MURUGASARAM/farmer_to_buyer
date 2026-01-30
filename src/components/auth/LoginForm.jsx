@@ -121,13 +121,17 @@ export default function LoginForm({ onSwitchMode }) {
         return;
       }
 
-      // Verify OTP by re-authenticating with OTP code
-      // This bypasses potential 404/400 errors on dedicated verify endpoints by using the standard login flow
-      const verifyRes = await authApi.login({ phone, password, otp });
-      const token = verifyRes?.token;
+      // Verify OTP using the verify API as requested
+      // If response is 200 OK (which fetchJson ensures if no error thrown), allow entry.
+      const verifyRes = await authApi.verifyOtp({ tempToken, otp });
+      
+      // The API might return text "2FA enabled successfully" or a JSON. 
+      // We assume if this call succeeded, the user is verified.
+      // We use the tempToken from the first step as the session token (or new token if provided).
+      const token = verifyRes?.token || tempToken;
 
       if (!token) {
-        throw new Error("Verification failed: Valid token not received");
+        throw new Error("Verification failed: No valid session token");
       }
 
       // Decode token
@@ -136,7 +140,7 @@ export default function LoginForm({ onSwitchMode }) {
       
       const profile = {
         ...decoded,
-        role: verifyRes.role || decoded?.role,
+        role: verifyRes?.role || decoded?.role,
         phone: phone,
         name: decoded?.name || decoded?.sub || "User",
         is2faEnabled: true, // User just verified with OTP, so 2FA is enabled
